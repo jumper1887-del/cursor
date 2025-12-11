@@ -1,0 +1,57 @@
+# Cursor-spezifische Dateien (werden NICHT synchronisiert)
+.cursor/
+.cursorrules
+
+# Chat-Verläufe (können optional synchronisiert werden, wenn gewünscht)
+# chats/*_temp.md
+# chats/*_draft.md
+
+# Logs
+*.log
+logs/
+*.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporäre Dateien
+*.tmp
+*.temp
+*.bak
+
+# Credentials und Secrets (NIEMALS synchronisieren!)
+*.json
+!package.json
+client_secret_*.json
+*-*.json
+!segelliste-*.json
+
+# Medien-Dateien (optional - können groß sein)
+*.jpg
+*.png
+*.gif
+*.rar
+
+# Externe Downloads
+download.html
+dienstplan*.html
+schiffsbilder.html
+

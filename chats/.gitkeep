@@ -1,0 +1,10 @@
+# Dieser Ordner speichert Chat-Verläufe für GitHub-Synchronisation
+# 
+# So verwendest du ihn:
+# 1. Kopiere Chat-Inhalt aus Cursor (Strg+A, Strg+C)
+# 2. Erstelle neue Datei: chats/chat_YYYY-MM-DD_HH-MM.md
+# 3. Füge Chat-Inhalt ein
+# 4. git add chats/chat_YYYY-MM-DD_HH-MM.md
+# 5. git commit -m "Chat-Verlauf: [Thema]"
+# 6. git push
+
