@@ -1,0 +1,199 @@
+# 📋 Anleitung: Alle Skripte ausführen
+
+## 📁 Verzeichnis wechseln
+```bash
+cd /root/Skrip/Datenbank
+```
+
+---
+
+## 🚢 Schiffs_Datenbank.py
+
+### Basis-Befehle
+
+```bash
+# Datenbank initialisieren (einmalig)
+python3 Schiffs_Datenbank.py --init
+
+# Schiffe synchronisieren (Segelliste → HHLA Sheet)
+python3 Schiffs_Datenbank.py --sync
+
+# Schiffsdaten von VesselFinder importieren
+python3 Schiffs_Datenbank.py --import
+
+# Nur erste 5 Schiffe importieren
+python3 Schiffs_Datenbank.py --import --max 5
+
+# Schiffe mit "Keine Daten" nochmal suchen
+python3 Schiffs_Datenbank.py --keine-daten
+
+# Alle Schiffe anzeigen
+python3 Schiffs_Datenbank.py --show
+```
+
+### Erweiterte Optionen
+
+```bash
+# Browser sichtbar starten (besser gegen Bot-Blockierung)
+python3 Schiffs_Datenbank.py --import --visible
+
+# Wartezeit zwischen Anfragen erhöhen (Standard: 3 Sekunden)
+python3 Schiffs_Datenbank.py --import --delay 5
+
+# Erste 10 Schiffe überspringen, dann 5 verarbeiten
+python3 Schiffs_Datenbank.py --import --skip 10 --max 5
+```
+
+---
+
+## 🖼️ bilder_downloader.py
+
+```bash
+# Schiffsbilder herunterladen
+python3 bilder_downloader.py
+```
+
+---
+
+## 🌐 schiffsbilder_server.py (Flask-Server)
+
+```bash
+# Server starten
+python3 schiffsbilder_server.py
+
+# Server läuft dann auf: http://localhost:5000
+# Oder: http://DEINE-IP:5000
+```
+
+**Server stoppen:** `Strg + C`
+
+---
+
+## ⏰ Automatische Ausführung (Cron-Jobs)
+
+### Manuell testen
+
+```bash
+# Teste Schiffs_Datenbank (13:00 Uhr Job)
+/root/Skrip/run_schiffs_datenbank.sh
+
+# Teste bilder_downloader (13:15 Uhr Job)
+/root/Skrip/run_bilder_downloader.sh
+```
+
+### Logs ansehen
+
+```bash
+# Log für Schiffs_Datenbank
+tail -f /root/Skrip/logs/schiffs_datenbank_cron.log
+
+# Log für bilder_downloader
+tail -f /root/Skrip/logs/bilder_downloader_cron.log
+```
+
+### Cron-Jobs prüfen
+
+```bash
+# Zeige alle Cron-Jobs
+sudo crontab -l
+
+# Zeige nur unsere Jobs
+sudo crontab -l | grep -E "schiffs_datenbank|bilder_downloader"
+```
+
+**Automatische Zeiten:**
+- **13:00 Uhr** - Schiffs_Datenbank.py --import
+- **13:15 Uhr** - bilder_downloader.py
+
+---
+
+## 🔧 API-Server (api_server.py)
+
+```bash
+cd /root/Skrip
+python3 api_server.py
+
+# Server läuft dann auf: http://localhost:8000
+```
+
+**Server stoppen:** `Strg + C`
+
+---
+
+## 📝 Typischer Workflow
+
+### 1. Erste Einrichtung (einmalig)
+```bash
+cd /root/Skrip/Datenbank
+python3 Schiffs_Datenbank.py --init
+```
+
+### 2. Schiffe synchronisieren
+```bash
+python3 Schiffs_Datenbank.py --sync
+```
+
+### 3. Daten importieren
+```bash
+python3 Schiffs_Datenbank.py --import
+```
+
+### 4. Bilder herunterladen
+```bash
+python3 bilder_downloader.py
+```
+
+### 5. Server starten (optional)
+```bash
+python3 schiffsbilder_server.py
+```
+
+---
+
+## ❓ Hilfe bekommen
+
+```bash
+# Zeige alle verfügbaren Optionen
+python3 Schiffs_Datenbank.py --help
+
+# Oder ohne Argumente (zeigt Kurzübersicht)
+python3 Schiffs_Datenbank.py
+```
+
+---
+
+## 📂 Wichtige Dateien
+
+- **Skripte:** `/root/Skrip/Datenbank/`
+- **Logs:** `/root/Skrip/logs/`
+- **Bilder:** `/root/Skrip/Datenbank/Schiffsbilder/`
+- **Datenbank:** `/root/Skrip/Datenbank/schiffe.db` (Linux) oder `~/Documents/Scripts/schiffe.db` (Windows)
+
+---
+
+## 🐛 Probleme?
+
+### "Datei nicht gefunden"
+```bash
+# Prüfe ob Datei existiert
+ls -la /root/Skrip/Datenbank/Schiffs_Datenbank.py
+ls -la /root/Skrip/Datenbank/bilder_downloader.py
+```
+
+### "Permission denied"
+```bash
+# Mache Script ausführbar
+chmod +x /root/Skrip/run_schiffs_datenbank.sh
+chmod +x /root/Skrip/run_bilder_downloader.sh
+```
+
+### Logs prüfen
+```bash
+# Letzte 50 Zeilen
+tail -50 /root/Skrip/logs/schiffs_datenbank_cron.log
+```
+
+---
+
+**💡 Tipp:** Die meisten Skripte laufen automatisch täglich um 13:00 und 13:15 Uhr. Du musst sie nur manuell ausführen, wenn du sofort etwas machen willst.
+

@@ -1,0 +1,25 @@
+[Unit]
+Description=Segelliste Upload (holt & aktualisiert Google Sheet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Arbeitsverzeichnis passend zu deinem Skript
+WorkingDirectory=/root/Skrip
+# Direkt das Python-Skript:
+# ExecStart=/usr/bin/python3 /root/Skrip/segelliste_upload.py
+# Besser mit Wrapper (Logging+Lock):
+ExecStart=/root/Skrip/run_segelliste_upload.sh
+# Umgebung (.env) optional:
+# EnvironmentFile=/root/Skrip/.env
+# Bei Selenium manchmal größere Shared Memory nötig:
+# PrivateTmp=true
+
+# Ressourceneinstellungen (optional):
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

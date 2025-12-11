@@ -1,0 +1,16 @@
+[Unit]
+Description=Timer: Schiffsbilder täglich um 08:00 Uhr
+Requires=schiffsbilder.service
+
+[Timer]
+# Täglich um 08:00 Uhr
+OnCalendar=daily
+OnCalendar=*-*-* 08:00:00
+# Wichtig: Führt Skript nach, wenn Rechner zum Zeitpunkt aus war
+Persistent=true
+# Genauigkeit: Startet innerhalb von 1 Minute nach geplanter Zeit
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target
+

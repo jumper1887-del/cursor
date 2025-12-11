@@ -1,0 +1,74 @@
+#!/bin/bash
+# Script zum Finden von Schiffs_Datenbank.py und Anpassen des Pfads
+
+echo "=== Suche Schiffs_Datenbank.py ==="
+echo ""
+
+# Mögliche Pfade
+POSSIBLE_PATHS=(
+    "/root/Skrip/Schiffs_Datenbank.py"
+    "/root/Skrip/Datenbank/Schiffs_Datenbank.py"
+    "/root/Skrip/Script/Schiffs_Datenbank.py"
+    "$(find /root -name "Schiffs_Datenbank.py" 2>/dev/null | head -1)"
+)
+
+FOUND_PATH=""
+
+for path in "${POSSIBLE_PATHS[@]}"; do
+    if [ -f "$path" ]; then
+        FOUND_PATH="$path"
+        echo "✓ Gefunden: $path"
+        break
+    fi
+done
+
+if [ -z "$FOUND_PATH" ]; then
+    echo "✗ Schiffs_Datenbank.py nicht gefunden!"
+    echo ""
+    echo "Suche manuell..."
+    find /root -name "*Schiffs*Datenbank*.py" 2>/dev/null || echo "Keine Dateien gefunden"
+    echo ""
+    echo "Bitte gib den vollständigen Pfad zur Datei an:"
+    read -p "Pfad: " FOUND_PATH
+    
+    if [ ! -f "$FOUND_PATH" ]; then
+        echo "✗ Datei existiert nicht: $FOUND_PATH"
+        exit 1
+    fi
+fi
+
+echo ""
+echo "=== Passe run_schiffs_datenbank.sh an ==="
+
+# Erstelle neues Script mit korrektem Pfad
+cat > /root/Skrip/run_schiffs_datenbank.sh << SCRIPTEOF
+#!/bin/bash
+# Shell-Script zum Ausführen von Schiffs_Datenbank.py
+# Wird von Cron-Job aufgerufen
+
+# Pfad zum Python-Skript
+SCRIPT_PATH="$FOUND_PATH"
+LOG_FILE="/root/Skrip/logs/schiffs_datenbank_cron.log"
+LOCK_FILE="/var/lock/schiffs_datenbank.lock"
+
+# Erstelle Log-Verzeichnis falls nicht vorhanden
+mkdir -p "\$(dirname "\$LOG_FILE")"
+
+# Führe das Skript mit --import aus (sucht Schiffe und importiert Daten)
+/usr/bin/flock -n "\$LOCK_FILE" python3 "\$SCRIPT_PATH" --import >> "\$LOG_FILE" 2>&1
+
+exit \$?
+SCRIPTEOF
+
+chmod +x /root/Skrip/run_schiffs_datenbank.sh
+
+echo "✓ Script aktualisiert mit Pfad: $FOUND_PATH"
+echo ""
+echo "=== Test ==="
+echo "Führe Test aus..."
+/root/Skrip/run_schiffs_datenbank.sh
+
+echo ""
+echo "=== Log (letzte 20 Zeilen) ==="
+tail -20 /root/Skrip/logs/schiffs_datenbank_cron.log 2>/dev/null || echo "Log-Datei noch nicht erstellt"
+

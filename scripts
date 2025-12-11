@@ -1,0 +1,227 @@
+import os
+import time
+import hashlib
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
+
+EXCEL_PATH = os.getenv("SEGELLISTE_PATH", "/root/Skrip/Downloads/segelliste.xlsx")
+API_KEY = os.getenv("SEGELLISTE_API_KEY")  # Wenn gesetzt, wird Header-Prüfung aktiviert
+SCHIFFS_DATENBANK_API_KEY = os.getenv("SCHIFFS_DATENBANK_API_KEY", "schiffs-db-secret-key-2024")  # API-Key für Schiffs_Datenbank.py
+TIMEZONE = os.getenv("SEGELLISTE_TIMEZONE", "Europe/Berlin")
+
+# Optionales CORS (für deine React App)
+ALLOWED_ORIGINS = os.getenv("SEGELLISTE_CORS", "*").split(",")
+
+app = FastAPI(title="Segelliste API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Einfache In-Memory-Cache-Struktur
+_cache: Dict[str, Dict[str, Any]] = {}
+CACHE_TTL_SECONDS = int(os.getenv("SEGELLISTE_CACHE_TTL", "30"))  # 30s default
+
+
+def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """
+    Aktiviert sich nur, falls API_KEY gesetzt ist.
+    Dann muss der Client den Header X-API-Key mitsenden.
+    """
+    if API_KEY:
+        if not x_api_key or x_api_key != API_KEY:
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return True
+
+
+def file_signature(path: str) -> str:
+    """
+    Erzeuge eine Signatur aus Dateigröße + mtime,
+    um Caching zu invalidieren, wenn Datei neu ist.
+    """
+    st = os.stat(path)
+    raw = f"{st.st_mtime_ns}-{st.st_size}".encode()
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def load_excel() -> pd.DataFrame:
+    if not os.path.exists(EXCEL_PATH):
+        raise FileNotFoundError(f"Excel-Datei nicht gefunden: {EXCEL_PATH}")
+    # dtype=str: alle Zellen als Text
+    df = pd.read_excel(EXCEL_PATH, dtype=str, engine="openpyxl")
+    df = df.fillna("")
+    return df
+
+
+def to_array(df: pd.DataFrame) -> List[List[str]]:
+    header = [str(c) for c in df.columns.tolist()]
+    rows = [[str(cell) for cell in row] for row in df.values.tolist()]
+    return [header] + rows
+
+
+def parse_datetime(value: str) -> Optional[datetime]:
+    """
+    Versucht typische Formate wie 01.10.2025 13:45 oder 01.10.2025.
+    Gibt None zurück, wenn Parsing scheitert.
+    """
+    if not value:
+        return None
+    fmts = ["%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d %H:%M", "%Y-%m-%d"]
+    for f in fmts:
+        try:
+            return datetime.strptime(value, f)
+        except ValueError:
+            continue
+    return None
+
+
+def classify(df: pd.DataFrame) -> Dict[str, List[List[str]]]:
+    """
+    Liefert drei Listen: shipsOnSite, incomingShips, archivedShips (jeweils string[][]).
+    Aktuelle Heuristik (bitte anpassen, wenn du exakte Regeln hast):
+
+    - Sucht nach Spaltennamen (case-insensitive) für:
+      - Schiff: enthält 'schiff'
+      - Gepl. Ankunft: enthält 'ankunft'
+      - Liegeort: enthält 'liege'
+      - Archiv-Indikator: Spalte, die 'weg' oder 'archiv' im header hat (optional)
+
+    Heuristik:
+      * archivedShips: wenn in einer erkannten Archiv-Spalte ein Wert steht
+      * incomingShips: Ankunftszeit > jetzt
+      * shipsOnSite: sonst
+    """
+    # Spalten-Matching
+    lower_cols = {c.lower(): c for c in df.columns}
+    col_ship = next((orig for low, orig in lower_cols.items() if "schiff" in low), None)
+    col_arrival = next((orig for low, orig in lower_cols.items() if "ankunft" in low), None)
+    col_liege = next((orig for low, orig in lower_cols.items() if "liege" in low), None)
+    col_archive = next((orig for low, orig in lower_cols.items() if "archiv" in low or "weg" in low), None)
+
+    # Wenn nichts erkannt wurde, geben wir alles einfach als shipsOnSite zurück
+    if not col_ship:
+        full_array = to_array(df)
+        return {
+            "shipsOnSite": full_array,
+            "incomingShips": [full_array[0]],
+            "archivedShips": [full_array[0]],
+        }
+
+    now = datetime.now()
+    ships_on_site = []
+    incoming = []
+    archived = []
+
+    # Header vorbereiten
+    header = [str(c) for c in df.columns.tolist()]
+
+    for _, row in df.iterrows():
+        row_arr = [str(row[c]) for c in df.columns]
+        # Archiv?
+        if col_archive and row[col_archive].strip():
+            archived.append(row_arr)
+            continue
+
+        arrival_dt = None
+        if col_arrival:
+            arrival_dt = parse_datetime(str(row[col_arrival]).strip())
+
+        # Incoming?
+        if arrival_dt and arrival_dt > now:
+            incoming.append(row_arr)
+            continue
+
+        # Vor Ort (Standard)
+        ships_on_site.append(row_arr)
+
+    # In string[][] umwandeln (Header + Rows)
+    def pack(rows: List[List[str]]) -> List[List[str]]:
+        return [header] + rows if rows else [header]
+
+    return {
+        "shipsOnSite": pack(ships_on_site),
+        "incomingShips": pack(incoming),
+        "archivedShips": pack(archived)
+    }
+
+
+def get_data() -> Dict[str, Any]:
+    """
+    Liefert klassifizierte Daten, nutzt Cache wenn möglich.
+    """
+    if not os.path.exists(EXCEL_PATH):
+        raise HTTPException(status_code=404, detail="Excel-Datei nicht gefunden")
+
+    sig = file_signature(EXCEL_PATH)
+    cache_key = f"ships:{sig}"
+    cached = _cache.get(cache_key)
+    now = time.time()
+    if cached and (now - cached["time"] < CACHE_TTL_SECONDS):
+        return {**cached["payload"], "cached": True}
+
+    df = load_excel()
+    classified = classify(df)
+    payload = {
+        "cached": False,
+        "fileSignature": sig,
+        "generatedAt": datetime.utcnow().isoformat() + "Z",
+        **classified
+    }
+    _cache.clear()
+    _cache[cache_key] = {"time": now, "payload": payload}
+    return payload
+
+
+@app.get("/api/ships", dependencies=[Depends(require_api_key)])
+def api_ships():
+    """
+    Haupt-Endpunkt: Liefert JSON im gewünschten Format:
+    {
+      "shipsOnSite": string[][],
+      "incomingShips": string[][],
+      "archivedShips": string[][],
+      "fileSignature": "...",
+      ...
+    }
+    """
+    data = get_data()
+    return JSONResponse(content={
+        "shipsOnSite": data["shipsOnSite"],
+        "incomingShips": data["incomingShips"],
+        "archivedShips": data["archivedShips"]
+    })
+
+
+@app.get("/api/ships/meta", dependencies=[Depends(require_api_key)])
+def api_meta():
+    """
+    Meta-Infos + ob Cache verwendet wurde.
+    """
+    data = get_data()
+    return JSONResponse(content=data)
+
+
+@app.get("/api/ships/raw", dependencies=[Depends(require_api_key)])
+def api_raw():
+    """
+    Gibt kompletten Sheet als string[][] zurück (ohne Klassifizierung).
+    """
+    if not os.path.exists(EXCEL_PATH):
+        raise HTTPException(status_code=404, detail="Excel-Datei nicht gefunden")
+    df = load_excel()
+    return JSONResponse(content={
+        "data": to_array(df),
+        "fileSignature": file_signature(EXCEL_PATH)
+    })
+

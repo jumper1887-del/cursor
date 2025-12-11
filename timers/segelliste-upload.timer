@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer: Segelliste alle 2 Stunden ab 01:58 (xx:58)
+
+[Timer]
+OnCalendar=*-*-* 01/2:58:00
+Persistent=true
+Unit=segelliste-upload.service
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

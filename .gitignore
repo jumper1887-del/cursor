@@ -41,8 +41,9 @@ Desktop.ini
 *.json
 !package.json
 client_secret_*.json
+segelliste-*.json
+# Alle anderen JSON-Dateien mit potentiellen Secrets
 *-*.json
-!segelliste-*.json
 
 # Medien-Dateien (optional - können groß sein)
 *.jpg
@@ -54,5 +55,17 @@ client_secret_*.json
 download.html
 dienstplan*.html
 schiffsbilder.html
+index.html
+
+# Daten-Dateien (optional - können groß sein)
+*.xlsx
+*.xls
+last_download_hash.txt
+schiffs_datenbank_cron.txt
+
+# Ordner mit großen Dateien
+Fotus/
+Kay/
+templates/
 
 

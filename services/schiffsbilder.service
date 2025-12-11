@@ -1,0 +1,14 @@
+[Unit]
+Description=Schiffsbilder Downloader Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/Skrip/Datenbank
+ExecStart=/usr/bin/python3 /root/Skrip/Datenbank/Schiffsbilder.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
